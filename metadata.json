@@ -1,0 +1,7 @@
+{
+  "name": "LexAI - Your Legal Padi",
+  "description": "A Nigerian-style AI legal companion combining street smarts with constitutional facts. Includes Cruise Mode, serious legal advice, and document generation.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
