@@ -7,6 +7,7 @@ import { QuickActionGrid } from './components/QuickActionGrid';
 import { PoliceWahalaMode } from './components/PoliceWahalaMode';
 import { DocGenerator } from './components/DocGenerator';
 import { LiveCallInterface } from './components/LiveCallInterface';
+import { FakeCallSetup } from './components/FakeCallSetup';
 import { ViewState, UserMode } from './types';
 import { ToggleLeft, ToggleRight } from 'lucide-react';
 
@@ -15,10 +16,29 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('home');
   const [userMode, setUserMode] = useState<UserMode>('cruise');
   const [chatInitialPrompt, setChatInitialPrompt] = useState<string | undefined>(undefined);
+  
+  // State for Fake Call
+  const [fakeCallConfig, setFakeCallConfig] = useState<{title: string, prompt: string} | undefined>(undefined);
 
   const handleQuickAction = (prompt: string) => {
     setChatInitialPrompt(prompt);
     setCurrentView('chat');
+  };
+
+  const handleStartFakeCall = (title: string, prompt: string) => {
+      setFakeCallConfig({ title, prompt });
+      setCurrentView('call');
+  };
+
+  const handleEndCall = () => {
+      if (fakeCallConfig) {
+          // If we were in a fake call simulation, go back to the setup screen to try another
+          setFakeCallConfig(undefined);
+          setCurrentView('fakeCallSetup');
+      } else {
+          // Normal call ended
+          setCurrentView('home');
+      }
   };
 
   if (!hasOnboarded) {
@@ -43,7 +63,11 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'home' && (
-        <QuickActionGrid onActionClick={handleQuickAction} userName="Murtala" />
+        <QuickActionGrid 
+            onActionClick={handleQuickAction} 
+            onSimulatorClick={() => setCurrentView('fakeCallSetup')}
+            userName="Murtala" 
+        />
       )}
       
       {currentView === 'chat' && (
@@ -63,7 +87,18 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'call' && (
-        <LiveCallInterface mode={userMode} onEndCall={() => setCurrentView('home')} />
+        <LiveCallInterface 
+            mode={userMode} 
+            onEndCall={handleEndCall}
+            customConfig={fakeCallConfig}
+        />
+      )}
+      
+      {currentView === 'fakeCallSetup' && (
+          <FakeCallSetup 
+            onBack={() => setCurrentView('home')}
+            onStartCall={handleStartFakeCall}
+          />
       )}
 
       {currentView === 'profile' && (
@@ -81,7 +116,7 @@ const App: React.FC = () => {
                     <span className="text-zinc-400">Pidgin/English</span>
                 </div>
             </div>
-            <p className="text-zinc-600 text-xs mt-10">LexAI v1.0.0 (Cruise Build)</p>
+            <p className="text-zinc-600 text-xs mt-10">LexAI v1.1.0 (Simulator Build)</p>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 
-export type ViewState = 'onboarding' | 'home' | 'chat' | 'police' | 'documents' | 'profile' | 'call';
+export type ViewState = 'onboarding' | 'home' | 'chat' | 'police' | 'documents' | 'profile' | 'call' | 'fakeCallSetup';
 
 export type UserMode = 'cruise' | 'serious';
 

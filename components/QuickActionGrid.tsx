@@ -1,14 +1,16 @@
+
 import React, { useMemo } from 'react';
 import { QUICK_ACTIONS, DAILY_TIPS } from '../constants';
 import * as Icons from 'lucide-react';
-import { Shield, Briefcase, Home, Heart, Ban, Search } from 'lucide-react'; // Explicit imports for mapping
+import { Shield, Briefcase, Home, Heart, Ban, Search, Drama } from 'lucide-react'; // Explicit imports for mapping
 
 interface QuickActionGridProps {
   onActionClick: (prompt: string) => void;
+  onSimulatorClick: () => void;
   userName?: string;
 }
 
-export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick, userName = "Padi" }) => {
+export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick, onSimulatorClick, userName = "Padi" }) => {
   
   const dailyTip = useMemo(() => DAILY_TIPS[Math.floor(Math.random() * DAILY_TIPS.length)], []);
 
@@ -49,18 +51,22 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick,
         </p>
       </div>
 
-      {/* Search Fake */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-zinc-500" />
+      {/* Wahala Simulator Button (New) */}
+      <button 
+        onClick={onSimulatorClick}
+        className="w-full bg-gradient-to-r from-purple-900/50 to-zinc-900 border border-purple-500/30 rounded-2xl p-4 flex items-center justify-between group active:scale-95 transition-transform"
+      >
+        <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-500/20 rounded-full text-purple-400 group-hover:text-purple-300">
+                <Drama size={24} />
+            </div>
+            <div className="text-left">
+                <h3 className="text-white font-bold text-lg">Wahala Simulator</h3>
+                <p className="text-zinc-400 text-xs">Practice calling angry landlord or police</p>
+            </div>
         </div>
-        <button 
-            onClick={() => onActionClick("")}
-            className="w-full bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-xl py-4 pl-10 pr-4 text-left text-sm hover:border-zinc-700 transition-colors"
-        >
-            Search legal wahala...
-        </button>
-      </div>
+        <Icons.ChevronRight className="text-zinc-600" />
+      </button>
 
       {/* Grid */}
       <div>
