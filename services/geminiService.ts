@@ -1,51 +1,25 @@
-
-import { GoogleGenAI, Content, Part, LiveServerMessage, Modality } from "@google/genai";
-import { LEXAI_SYSTEM_INSTRUCTION } from '../constants';
-
-const getClient = () => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("API_KEY is missing from environment variables");
-    }
-    return new GoogleGenAI({ apiKey });
-};
+import { ChatMessage, UserMode } from '../types';
 
 export const sendMessageToLexAI = async (
     message: string, 
     history: { role: 'user' | 'model', text: string }[],
     mode: 'cruise' | 'serious'
 ): Promise<string> => {
-    const client = getClient();
-    
-    // Adjust system instruction based on mode
-    let systemInstruction = LEXAI_SYSTEM_INSTRUCTION;
-    if (mode === 'serious') {
-        systemInstruction = "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice citing the Nigerian Constitution and Acts. Do not use Pidgin or jokes. Maintain a professional, empathetic tone.";
-    }
-
-    // Convert history to Gemini format
-    const contents: Content[] = history.map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text } as Part]
-    }));
-
-    // Add current message
-    contents.push({
-        role: 'user',
-        parts: [{ text: message } as Part]
-    });
-
     try {
-        const response = await client.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: contents,
-            config: {
-                systemInstruction: systemInstruction,
-                temperature: mode === 'cruise' ? 0.8 : 0.3, // Higher creativity for cruise, lower for serious
-            }
+        const response = await fetch("/api/lexai/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message, history, mode })
         });
 
-        return response.text || "Ah, network small wahala. Abeg try asking again.";
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.text || "Ah, network small wahala. Abeg try asking again.";
     } catch (error) {
         console.error("Gemini API Error:", error);
         return "Omo, I encounter small error. Check your internet connection make we try again.";
@@ -56,26 +30,23 @@ export const generateDocumentContent = async (
     templateType: string,
     formData: Record<string, string>
 ): Promise<string> => {
-    const client = getClient();
-    
-    const prompt = `
-    Act as a Nigerian Lawyer. Create a simple, legally sound draft for a "${templateType}".
-    
-    Here are the details provided:
-    ${Object.entries(formData).map(([key, value]) => `- ${key}: ${value}`).join('\n')}
-    
-    Format nicely with clear headings. 
-    Add a disclaimer at the bottom saying: "This is a generated template for educational purposes. Consult a lawyer before signing."
-    `;
-
     try {
-        const response = await client.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
+        const response = await fetch("/api/lexai/document", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ templateType, formData })
         });
-        return response.text || "Could not generate document.";
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.text || "Could not generate document.";
     } catch (error) {
-        console.error(error);
+        console.error("Document Generator Error:", error);
         return "Error generating document.";
     }
 };
@@ -142,7 +113,7 @@ export class LiveSessionManager {
   private nextStartTime = 0;
   private sources = new Set<AudioBufferSourceNode>();
   private active = false;
-  private currentSessionPromise: Promise<any> | null = null;
+  private socket: WebSocket | null = null;
   private isConnecting = false;
 
   // Rate limiting: Static to persist across re-instantiations in React
@@ -176,13 +147,10 @@ export class LiveSessionManager {
         const errorMsg = `Connection Error: Rate limit exceeded. Wait ${waitTime}s.`;
         console.warn(errorMsg);
         onStatusChange(errorMsg);
-        return; // Prevents calling API
+        return;
     }
     
-    // Add current attempt
     LiveSessionManager.globalConnectionTimestamps.push(now);
-    // ------------------------
-
     this.isConnecting = true;
 
     // Ensure clean state before connecting
@@ -191,13 +159,7 @@ export class LiveSessionManager {
     this.active = true;
     onStatusChange("Initializing Audio...");
 
-    let client: GoogleGenAI;
-
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API Key not found");
-        client = new GoogleGenAI({ apiKey });
-
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         this.inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
         this.outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
@@ -221,32 +183,6 @@ export class LiveSessionManager {
       this.isConnecting = false;
       return;
     }
-    
-    // Config based on mode or Custom Prompt
-    let systemInstruction = "";
-    
-    if (customSystemInstruction) {
-        // Robust instructions for roleplay
-        systemInstruction = `
-        IMPORTANT: YOU ARE IN A ROLEPLAY SIMULATION FOR EDUCATIONAL PURPOSES.
-        
-        YOUR CHARACTER:
-        ${customSystemInstruction}
-        
-        RULES:
-        1. COMMIT FULLY to the character. Do not break character to say "I am an AI".
-        2. If the character is described as angry, rude, or aggressive, BE THAT WAY. This is a training simulation for conflict resolution.
-        3. Speak in Nigerian Pidgin or appropriate local dialect for the character.
-        4. Keep responses spoken-style (short, reactive, conversational).
-        5. DO NOT provide legal advice in this mode. You are the 'Wahala' (Problem), not the solution.
-        `;
-    } else {
-        systemInstruction = mode === 'cruise' 
-          ? "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). You speak in Nigerian Pidgin English. You are street-wise, hilarious, and give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational for voice. Always sound confident."
-          : "You are a professional Nigerian Legal Counsel. Speak in clear, formal English. Be empathetic, authoritative, and concise. Provide accurate legal guidance based on the Nigerian Constitution.";
-    }
-    
-    const voiceName = mode === 'cruise' || customSystemInstruction ? 'Puck' : 'Zephyr';
 
     try {
         let outputNode: GainNode | null = null;
@@ -255,136 +191,135 @@ export class LiveSessionManager {
            outputNode.connect(this.outputAudioContext.destination);
         }
 
-        // Safety Settings to allow "Angry" personas without refusal
-        const safetySettings = customSystemInstruction ? [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-        ] : undefined;
+        // Establish WebSocket connection to full-stack server proxy endpoint
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let wsUrl = `${protocol}//${window.location.host}/api/live?mode=${mode}`;
+        if (customSystemInstruction) {
+            wsUrl += `&customSystemInstruction=${encodeURIComponent(customSystemInstruction)}`;
+        }
 
-        this.currentSessionPromise = client.live.connect({
-          model: 'gemini-2.5-flash-native-audio-preview-09-2025',
-          callbacks: {
-            onopen: () => {
-              if (!this.active) return;
-              onStatusChange(customSystemInstruction ? "Actor Ready. Oya talk." : (mode === 'cruise' ? "Oya talk, I dey hear..." : "Listening..."));
-              
-              if (!this.inputAudioContext || !this.stream) return;
+        this.socket = new WebSocket(wsUrl);
 
-              try {
-                this.inputSource = this.inputAudioContext.createMediaStreamSource(this.stream);
-                this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
+        this.socket.onopen = () => {
+            if (!this.active) return;
+            console.log("WebSocket proxy connection established");
+        };
+
+        this.socket.onmessage = async (event) => {
+            if (!this.active) return;
+            try {
+                const parsed = JSON.parse(event.data);
                 
-                this.scriptProcessor.onaudioprocess = (e) => {
-                  if (!this.active || !this.currentSessionPromise) return;
-                  
-                  const inputData = e.inputBuffer.getChannelData(0);
-                  
-                  // Calculate volume for UI visualizer
-                  let sum = 0;
-                  for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
-                  onVolume(Math.sqrt(sum / inputData.length));
+                if (parsed.type === "open") {
+                    onStatusChange(customSystemInstruction ? "Actor Ready. Oya talk." : (mode === 'cruise' ? "Oya talk, I dey hear..." : "Listening..."));
+                    
+                    if (!this.inputAudioContext || !this.stream) return;
 
-                  const pcmBlob = createBlob(inputData);
-                  
-                  this.currentSessionPromise!.then((session) => {
-                    if (this.active) {
-                        try {
-                           session.sendRealtimeInput({ media: pcmBlob });
-                        } catch(e) {
-                           console.error("Error sending input", e);
-                        }
+                    try {
+                        this.inputSource = this.inputAudioContext.createMediaStreamSource(this.stream);
+                        this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
+                        
+                        this.scriptProcessor.onaudioprocess = (e) => {
+                          if (!this.active || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+                          
+                          const inputData = e.inputBuffer.getChannelData(0);
+                          
+                          // Calculate volume for UI visualizer
+                          let sum = 0;
+                          for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+                          onVolume(Math.sqrt(sum / inputData.length));
+
+                          const pcmBlob = createBlob(inputData);
+                          
+                          try {
+                              this.socket.send(JSON.stringify({
+                                  type: "realtimeInput",
+                                  input: { audio: pcmBlob }
+                              }));
+                          } catch (e) {
+                              console.error("Error sending real-time audio chunk:", e);
+                          }
+                        };
+
+                        this.inputSource.connect(this.scriptProcessor);
+                        this.scriptProcessor.connect(this.inputAudioContext.destination);
+                    } catch (e) {
+                        console.error("Audio graph error:", e);
                     }
-                  }).catch(err => {
-                      // Session might have closed
-                  });
-                };
+                } else if (parsed.type === "message" && this.outputAudioContext) {
+                    const message = parsed.message;
+                    const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+                    
+                    if (base64Audio) {
+                        onStatusChange(customSystemInstruction ? "Actor Speaking..." : (mode === 'cruise' ? "Padi dey talk..." : "Speaking..."));
+                        
+                        // Ensure output context is running
+                        if (this.outputAudioContext.state === 'suspended') {
+                            await this.outputAudioContext.resume().catch(() => {});
+                        }
 
-                this.inputSource.connect(this.scriptProcessor);
-                this.scriptProcessor.connect(this.inputAudioContext.destination);
-              } catch (e) {
-                console.error("Audio graph error", e);
-              }
-            },
-            onmessage: async (message: LiveServerMessage) => {
-              if (!this.active || !this.outputAudioContext) return;
+                        this.nextStartTime = Math.max(this.nextStartTime, this.outputAudioContext.currentTime);
+                        
+                        const audioBuffer = await decodeAudioData(
+                          decode(base64Audio),
+                          this.outputAudioContext,
+                          24000,
+                          1
+                        );
 
-              const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
-              
-              if (base64Audio) {
-                onStatusChange(customSystemInstruction ? "Actor Speaking..." : (mode === 'cruise' ? "Padi dey talk..." : "Speaking..."));
-                
-                // Ensure output context is running
-                if (this.outputAudioContext.state === 'suspended') {
-                    await this.outputAudioContext.resume().catch(() => {});
+                        const source = this.outputAudioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        
+                        if (outputNode) {
+                            source.connect(outputNode);
+                        } else {
+                            source.connect(this.outputAudioContext.destination);
+                        }
+                        
+                        source.addEventListener('ended', () => {
+                           this.sources.delete(source);
+                           if (this.sources.size === 0 && this.active) {
+                             onStatusChange(customSystemInstruction ? "Actor Listening..." : (mode === 'cruise' ? "Oya talk, I dey hear..." : "Listening..."));
+                           }
+                        });
+
+                        source.start(this.nextStartTime);
+                        this.nextStartTime += audioBuffer.duration;
+                        this.sources.add(source);
+                    }
+
+                    if (message.serverContent?.interrupted) {
+                        this.stopPlayback();
+                        this.nextStartTime = 0;
+                    }
+                } else if (parsed.type === "close") {
+                    onStatusChange("Connection Closed");
+                    this.disconnect();
+                } else if (parsed.type === "error") {
+                    onStatusChange("Error: " + parsed.error);
+                    this.disconnect();
                 }
-
-                this.nextStartTime = Math.max(this.nextStartTime, this.outputAudioContext.currentTime);
-                
-                const audioBuffer = await decodeAudioData(
-                  decode(base64Audio),
-                  this.outputAudioContext,
-                  24000,
-                  1
-                );
-
-                const source = this.outputAudioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                
-                if (outputNode) {
-                    source.connect(outputNode);
-                } else {
-                    source.connect(this.outputAudioContext.destination);
-                }
-                
-                source.addEventListener('ended', () => {
-                   this.sources.delete(source);
-                   if (this.sources.size === 0 && this.active) {
-                     onStatusChange(customSystemInstruction ? "Actor Listening..." : (mode === 'cruise' ? "Oya talk, I dey hear..." : "Listening..."));
-                   }
-                });
-
-                source.start(this.nextStartTime);
-                this.nextStartTime += audioBuffer.duration;
-                this.sources.add(source);
-              }
-
-              if (message.serverContent?.interrupted) {
-                this.stopPlayback();
-                this.nextStartTime = 0;
-              }
-            },
-            onclose: () => {
-              if (this.active) {
-                  onStatusChange("Connection Closed");
-                  this.disconnect();
-              }
-            },
-            onerror: (err) => {
-              console.error("Live session error:", err);
-              onStatusChange("Network Error. Retry?");
-              this.disconnect();
+            } catch (err) {
+                console.error("Error processing websocket message:", err);
             }
-          },
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName } }
-            },
-            systemInstruction: systemInstruction,
-            safetySettings: safetySettings as any, // Cast to any to avoid strict type issues with new SDK variations
-          }
-        });
+        };
 
-        // Wait for connection to establish before releasing lock
-        await this.currentSessionPromise;
-        
+        this.socket.onclose = () => {
+            if (this.active) {
+                onStatusChange("Connection Closed");
+                this.disconnect();
+            }
+        };
+
+        this.socket.onerror = (err) => {
+            console.error("WebSocket error:", err);
+            onStatusChange("Network Error. Retry?");
+            this.disconnect();
+        };
+
     } catch (err: any) {
         console.error("Connection failed", err);
-        let msg = "Service Unavailable";
-        if (err.message && err.message.includes("403")) msg = "API Key Error";
-        else if (err.message && err.message.includes("503")) msg = "Service Busy";
-        
-        onStatusChange("Connection Error: " + msg);
+        onStatusChange("Connection Error: Service Unavailable");
         await this.disconnect();
     } finally {
         this.isConnecting = false;
@@ -430,13 +365,11 @@ export class LiveSessionManager {
       this.outputAudioContext = null;
     }
 
-    if (this.currentSessionPromise) {
-        this.currentSessionPromise.then(session => {
-            if (session && typeof session.close === 'function') {
-                session.close();
-            }
-        }).catch(() => {});
-        this.currentSessionPromise = null;
+    if (this.socket) {
+        try {
+            this.socket.close();
+        } catch (e) {}
+        this.socket = null;
     }
   }
 }
