@@ -31,9 +31,9 @@ async function startServer() {
     systemInstruction?: string;
     temperature?: number;
   }) {
-    // Sequence of models to try in case of 503 UNAVAILABLE or other transient failures.
-    // We prioritize gemini-3.5-flash as the primary recommended model for basic text tasks.
-    const models = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    // Sequence of models to try in case of 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED or other failures.
+    // We prioritize gemini-3.5-flash as the primary recommended model, with robust fallbacks.
+    const models = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-flash-latest"];
     let lastError = null;
 
     for (const model of models) {
