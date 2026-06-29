@@ -1,8 +1,9 @@
 
 import React, { useMemo } from 'react';
-import { QUICK_ACTIONS, DAILY_TIPS } from '../constants';
+import { QUICK_ACTIONS } from '../constants';
 import * as Icons from 'lucide-react';
 import { Shield, Briefcase, Home, Heart, Ban, Search, Drama } from 'lucide-react'; // Explicit imports for mapping
+import { DailyLegalTip } from './DailyLegalTip';
 
 interface QuickActionGridProps {
   onActionClick: (prompt: string) => void;
@@ -10,10 +11,12 @@ interface QuickActionGridProps {
   userName?: string;
 }
 
-export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick, onSimulatorClick, userName = "Padi" }) => {
+export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ 
+  onActionClick, 
+  onSimulatorClick, 
+  userName = "Padi"
+}) => {
   
-  const dailyTip = useMemo(() => DAILY_TIPS[Math.floor(Math.random() * DAILY_TIPS.length)], []);
-
   // Icon mapping helper
   const getIcon = (iconName: string) => {
     switch (iconName) {
@@ -27,7 +30,7 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick,
   };
 
   return (
-    <div className="p-5 pb-32 space-y-8">
+    <div className="p-5 pb-32 space-y-6">
       {/* Header */}
       <div className="mt-4 flex justify-between items-end">
         <div>
@@ -39,17 +42,7 @@ export const QuickActionGrid: React.FC<QuickActionGridProps> = ({ onActionClick,
       </div>
 
       {/* Daily Tip */}
-      <div className="bg-gradient-to-r from-green-900/40 to-zinc-900 border border-green-500/20 rounded-2xl p-5 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-2 opacity-10">
-            <Icons.Scale size={64} className="text-white" />
-        </div>
-        <span className="inline-block px-2 py-1 rounded bg-green-500/20 text-green-400 text-[10px] font-bold uppercase tracking-wider mb-2">
-            Tip of the day
-        </span>
-        <p className="text-sm font-medium text-zinc-100 leading-relaxed pr-8">
-            "{dailyTip}"
-        </p>
-      </div>
+      <DailyLegalTip />
 
       {/* Wahala Simulator Button (New) */}
       <button 

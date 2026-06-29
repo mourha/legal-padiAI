@@ -1,11 +1,12 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Phone, Mic, MicOff, X, Sparkles, Terminal, RefreshCw, AlertCircle, Loader2, Drama } from 'lucide-react';
-import { UserMode } from '../types';
+import { UserMode, UserLanguage } from '../types';
 import { LiveSessionManager } from '../services/geminiService';
 
 interface LiveCallInterfaceProps {
   mode: UserMode;
+  language: UserLanguage;
   onEndCall: () => void;
   customConfig?: {
       title: string;
@@ -13,7 +14,7 @@ interface LiveCallInterfaceProps {
   }
 }
 
-export const LiveCallInterface: React.FC<LiveCallInterfaceProps> = ({ mode, onEndCall, customConfig }) => {
+export const LiveCallInterface: React.FC<LiveCallInterfaceProps> = ({ mode, language, onEndCall, customConfig }) => {
   const [status, setStatus] = useState("Initializing...");
   const [volume, setVolume] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -40,7 +41,8 @@ export const LiveCallInterface: React.FC<LiveCallInterfaceProps> = ({ mode, onEn
           }
       },
       (vol) => setVolume(Math.min(vol * 5, 1)),
-      customConfig?.prompt // Pass the custom prompt if it exists
+      customConfig?.prompt, // Pass the custom prompt if it exists
+      language
     );
 
     return () => {

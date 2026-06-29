@@ -35,7 +35,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="h-screen bg-zinc-950 flex flex-col relative overflow-hidden">
+    <div className="h-full w-full bg-zinc-950 flex flex-col relative overflow-hidden">
       {/* Background Blobs */}
       <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-green-500/20 rounded-full blur-[100px]" />
       <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-purple-500/20 rounded-full blur-[100px]" />

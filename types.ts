@@ -3,6 +3,8 @@ export type ViewState = 'onboarding' | 'home' | 'chat' | 'police' | 'documents' 
 
 export type UserMode = 'cruise' | 'serious';
 
+export type UserLanguage = 'english_pidgin' | 'hausa' | 'igbo' | 'yoruba';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';

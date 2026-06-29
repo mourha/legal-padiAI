@@ -1,9 +1,10 @@
-import { ChatMessage, UserMode } from '../types';
+import { ChatMessage, UserMode, UserLanguage } from '../types';
 
 export const sendMessageToLexAI = async (
     message: string, 
     history: { role: 'user' | 'model', text: string }[],
-    mode: 'cruise' | 'serious'
+    mode: 'cruise' | 'serious',
+    language: UserLanguage = 'english_pidgin'
 ): Promise<string> => {
     try {
         const response = await fetch("/api/lexai/chat", {
@@ -11,7 +12,7 @@ export const sendMessageToLexAI = async (
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ message, history, mode })
+            body: JSON.stringify({ message, history, mode, language })
         });
 
         if (!response.ok) {
@@ -129,7 +130,8 @@ export class LiveSessionManager {
     mode: 'cruise' | 'serious',
     onStatusChange: (status: string) => void,
     onVolume: (vol: number) => void,
-    customSystemInstruction?: string
+    customSystemInstruction?: string,
+    language: UserLanguage = 'english_pidgin'
   ) {
     if (this.isConnecting) {
         console.warn("Connection already in progress.");
@@ -193,7 +195,7 @@ export class LiveSessionManager {
 
         // Establish WebSocket connection to full-stack server proxy endpoint
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        let wsUrl = `${protocol}//${window.location.host}/api/live?mode=${mode}`;
+        let wsUrl = `${protocol}//${window.location.host}/api/live?mode=${mode}&language=${language}`;
         if (customSystemInstruction) {
             wsUrl += `&customSystemInstruction=${encodeURIComponent(customSystemInstruction)}`;
         }

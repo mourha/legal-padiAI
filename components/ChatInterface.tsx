@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, AlertTriangle, Terminal } from 'lucide-react';
-import { ChatMessage, UserMode } from '../types';
+import { ChatMessage, UserMode, UserLanguage } from '../types';
 import { sendMessageToLexAI } from '../services/geminiService';
 import ReactMarkdown from 'react'; // Not using real react-markdown to avoid deps, implementing simple renderer
 
 interface ChatInterfaceProps {
   mode: UserMode;
+  language: UserLanguage;
   initialPrompt?: string;
   onClearInitialPrompt?: () => void;
 }
 
-export const ChatInterface: React.FC<ChatInterfaceProps> = ({ mode, initialPrompt, onClearInitialPrompt }) => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ mode, language, initialPrompt, onClearInitialPrompt }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -56,7 +57,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ mode, initialPromp
       // Prepare history
       const history = messages.map(m => ({ role: m.role, text: m.text }));
       
-      const responseText = await sendMessageToLexAI(text, history, mode);
+      const responseText = await sendMessageToLexAI(text, history, mode, language);
       
       const newBotMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),

@@ -12,7 +12,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView }) => {
   // Hide nav during call
   if (currentView === 'call') {
-      return <div className="h-screen bg-zinc-950 text-white">{children}</div>;
+      return <div className="h-full w-full bg-zinc-950 text-white overflow-hidden relative">{children}</div>;
   }
 
   const NavItem = ({ view, icon: Icon, label }: { view: ViewState, icon: any, label: string }) => {
@@ -31,15 +31,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeV
   };
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 overflow-hidden text-white selection:bg-green-500/30">
+    <div className="flex flex-col h-full w-full bg-zinc-950 overflow-hidden text-white selection:bg-green-500/30 relative">
       {/* Content Area */}
-      <main className="flex-1 overflow-y-auto pb-20 relative scroll-smooth">
+      <main className="flex-1 overflow-y-auto pb-24 relative scroll-smooth">
         {children}
       </main>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 glass-panel border-t border-zinc-800 z-50">
-        <div className="flex justify-around items-center h-16 max-w-lg mx-auto pb-safe">
+      <div className="absolute bottom-0 left-0 right-0 glass-panel border-t border-zinc-800 z-50">
+        <div className="flex justify-around items-center h-16 w-full pb-safe">
           <NavItem view="home" icon={Home} label="Home" />
           <NavItem view="chat" icon={MessageSquare} label="Chat" />
           

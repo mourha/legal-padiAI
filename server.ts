@@ -32,8 +32,8 @@ async function startServer() {
     temperature?: number;
   }) {
     // Sequence of models to try in case of 503 UNAVAILABLE or other transient failures.
-    // We prioritize gemini-2.5-flash as it is highly robust and has lower traffic/higher free limits right now.
-    const models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    // We prioritize gemini-3.5-flash as the primary recommended model for basic text tasks.
+    const models = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
     let lastError = null;
 
     for (const model of models) {
@@ -98,15 +98,39 @@ async function startServer() {
     throw lastError || new Error("All model fallback paths exhausted.");
   }
 
+  // Multilingual prompt helper for LexAI
+  function getSystemInstruction(mode: string, language: string): string {
+    if (mode === 'serious') {
+      switch (language) {
+        case 'hausa':
+          return "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice in formal Hausa language, citing the Nigerian Constitution and Acts. Maintain a professional, empathetic tone. Answer the user's questions clearly.";
+        case 'igbo':
+          return "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice in formal Igbo language, citing the Nigerian Constitution and Acts. Maintain a professional, empathetic tone. Answer the user's questions clearly.";
+        case 'yoruba':
+          return "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice in formal Yoruba language, citing the Nigerian Constitution and Acts. Maintain a professional, empathetic tone. Answer the user's questions clearly.";
+        default:
+          return "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice citing the Nigerian Constitution and Acts. Do not use Pidgin or jokes. Maintain a professional, empathetic tone.";
+      }
+    } else {
+      switch (language) {
+        case 'hausa':
+          return "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). Speak in a lighthearted, street-smart Hausa with a friendly 'Legal Padi' attitude (funny Nigerian lawyer style), sometimes mixing in common English/Pidgin phrases. Give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational. Always sound confident.";
+        case 'igbo':
+          return "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). Speak in a street-smart, engaging, and friendly Igbo with a funny 'Legal Padi' attitude, sometimes mixing in common English/Pidgin phrases. Give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational. Always sound confident.";
+        case 'yoruba':
+          return "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). Speak in a street-smart, respectful yet funny Yoruba with a friendly 'Legal Padi' attitude (humorous Nigerian lawyer style), sometimes mixing in common English/Pidgin phrases. Give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational. Always sound confident.";
+        default:
+          return "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). You speak in Nigerian Pidgin English. You are street-wise, hilarious, and give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational. Always sound confident.";
+      }
+    }
+  }
+
   // API Route for LexAI Chat
   app.post("/api/lexai/chat", async (req, res) => {
     try {
-      const { message, history, mode } = req.body;
+      const { message, history, mode, language = "english_pidgin" } = req.body;
       
-      let systemInstruction = "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). You speak in Nigerian Pidgin English. You are street-wise, hilarious, and give practical legal advice mixed with 'cruise' (humor). Always sound confident.";
-      if (mode === 'serious') {
-        systemInstruction = "You are a professional Nigerian Legal Assistant. Provide strictly formal, accurate legal advice citing the Nigerian Constitution and Acts. Do not use Pidgin or jokes. Maintain a professional, empathetic tone.";
-      }
+      const systemInstruction = getSystemInstruction(mode, language);
 
       // Convert history to Gemini format
       const contents = history.map((msg: any) => ({
@@ -157,6 +181,55 @@ async function startServer() {
     }
   });
 
+  // API Route for LexAI Daily Legal Tip
+  app.get("/api/lexai/daily-tip", async (req, res) => {
+    try {
+      const prompt = `
+      Act as a smart Nigerian Lawyer. Generate one random, highly relevant, and simplified Nigerian constitutional fact or legal right of citizens.
+      Return the response STRICTLY as a raw JSON object (with no markdown block tags like \`\`\`json) matching this structure:
+      {
+        "title": "A short catchy title of the legal right or fact (e.g., 'Right to Remain Silent' or 'Landlord Entry Rules')",
+        "explanation": "A simplified, street-smart explanation in standard Nigerian Pidgin mixed with simple English. Keep it warm, engaging, and clear (maximum 2-3 sentences).",
+        "citation": "The exact constitutional section or law act name (e.g., 'Section 35 of the 1999 Constitution' or 'Section 7 of the Tenancy Law')"
+      }
+      `;
+
+      const response = await generateContentWithFallback({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        temperature: 0.9
+      });
+
+      const text = response.text || "{}";
+      // Clean up markdown block wrappers if present
+      const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsedTip = JSON.parse(cleanText);
+
+      res.json(parsedTip);
+    } catch (error: any) {
+      console.error("Daily Tip API error:", error);
+      // Fallback tips in case of failure
+      const fallbacks = [
+        {
+          title: "Bail is Free",
+          explanation: "No let anybody run you street say you must pay money before they release suspect for police station. Under Nigerian law, bail is 100% free!",
+          citation: "Section 35 of the 1999 Constitution"
+        },
+        {
+          title: "Right to Remain Silent",
+          explanation: "If police arrest you, you get full right to keep quiet. You no must talk or answer any question until your lawyer dey present.",
+          citation: "Section 35(2) of the 1999 Constitution"
+        },
+        {
+          title: "Phone Search Protection",
+          explanation: "Police officers no get right to just stop you and begin search your phone contents unless dem get specific warrant or official authorization.",
+          citation: "Section 37 of the 1999 Constitution (Right to Privacy)"
+        }
+      ];
+      const randomFallback = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      res.json(randomFallback);
+    }
+  });
+
   // Set up HTTP server to integrate both Express and WebSockets
   const server = http.createServer(app);
 
@@ -169,6 +242,7 @@ async function startServer() {
     // Parse query parameters
     const url = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
     const mode = url.searchParams.get("mode") || "cruise";
+    const language = url.searchParams.get("language") || "english_pidgin";
     const customSystemInstruction = url.searchParams.get("customSystemInstruction");
 
     // Config based on mode or Custom Prompt
@@ -183,21 +257,19 @@ async function startServer() {
         RULES:
         1. COMMIT FULLY to the character. Do not break character to say "I am an AI".
         2. If the character is described as angry, rude, or aggressive, BE THAT WAY. This is a training simulation for conflict resolution.
-        3. Speak in Nigerian Pidgin or appropriate local dialect for the character.
+        3. Speak in Nigerian Pidgin or appropriate local dialect (${language === 'hausa' ? 'Hausa' : language === 'igbo' ? 'Igbo' : language === 'yoruba' ? 'Yoruba' : 'Nigerian Pidgin'}) for the character.
         4. Keep responses spoken-style (short, reactive, conversational).
         5. DO NOT provide legal advice in this mode. You are the 'Wahala' (Problem), not the solution.
         `;
     } else {
-        systemInstruction = mode === 'cruise' 
-          ? "You are LexAI, a funny Nigerian lawyer (Your Legal Padi). You speak in Nigerian Pidgin English. You are street-wise, hilarious, and give practical legal advice mixed with 'cruise' (humor). Keep responses relatively short and conversational for voice. Always sound confident."
-          : "You are a professional Nigerian Legal Counsel. Speak in clear, formal English. Be empathetic, authoritative, and concise. Provide accurate legal guidance based on the Nigerian Constitution.";
+        systemInstruction = getSystemInstruction(mode, language);
     }
 
     const voiceName = mode === 'cruise' || customSystemInstruction ? 'Puck' : 'Zephyr';
 
     let session: any = null;
     let connected = false;
-    const liveModels = ['gemini-2.0-flash-exp', 'gemini-3.1-flash-live-preview'];
+    const liveModels = ['gemini-3.1-flash-live-preview'];
 
     // Helper to connect to a specific Live API model sequentially
     const connectToLiveModel = (modelName: string): Promise<any> => {
