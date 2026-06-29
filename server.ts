@@ -5,25 +5,22 @@ import { WebSocketServer } from "ws";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
-  
-  app.use(express.json());
+const app = express();
+app.use(express.json());
 
-  // Initialize Gemini server-side using GEMINI_API_KEY
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("Warning: GEMINI_API_KEY is not defined in environment variables.");
-  }
-  const ai = new GoogleGenAI({
-    apiKey: apiKey || "",
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
+// Initialize Gemini server-side using GEMINI_API_KEY
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error("Warning: GEMINI_API_KEY is not defined in environment variables.");
+}
+const ai = new GoogleGenAI({
+  apiKey: apiKey || "",
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
     }
-  });
+  }
+});
 
   // Robust helper to generate text content with auto-retry and sequential model fallback
   async function generateContentWithFallback(options: {
@@ -552,8 +549,13 @@ DISCLAIMER: This is a generated template for educational purposes. Consult a law
     }
   });
 
-  // Set up HTTP server to integrate both Express and WebSockets
-  const server = http.createServer(app);
+  export default app;
+
+  async function startServer() {
+    const PORT = 3000;
+
+    // Set up HTTP server to integrate both Express and WebSockets
+    const server = http.createServer(app);
 
   // Set up WebSocket Server for Live API proxy
   const wss = new WebSocketServer({ noServer: true });
@@ -728,4 +730,6 @@ DISCLAIMER: This is a generated template for educational purposes. Consult a law
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
